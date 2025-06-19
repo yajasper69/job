@@ -1,0 +1,69 @@
+import logging
+from aiogram import Bot, Dispatcher, executor, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+import asyncpg
+
+# Настройка подключения к PostgreSQL
+DB_CONFIG = {
+    "user": "your_username",
+    "password": "your_password",
+    "database": "food_delivery",
+    "host": "localhost"
+}
+
+# Инициализация бота
+API_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+bot = Bot(token=API_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+# Состояния для FSM
+class OrderFood(StatesGroup):
+    choosing_restaurant = State()
+    choosing_food = State()
+    entering_address = State()
+    payment = State()
+
+# Команда старта
+@dp.message_handler(commands=['start'])
+async def cmd_start(message: types.Message):
+    await message.reply("🍔 Добро пожаловать в бот доставки еды!\n"
+                      "Выберите действие:\n"
+                      "/order - Сделать заказ\n"
+                      "/cart - Посмотреть корзину\n"
+                      "/history - История заказов")
+
+# Начало оформления заказа
+@dp.message_handler(commands=['order'])
+async def cmd_order(message: types.Message):
+    # Получаем список ресторанов из БД
+    conn = await asyncpg.connect(**DB_CONFIG)
+    restaurants = await conn.fetch("SELECT id, name FROM restaurants")
+    await conn.close()
+    
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    for restaurant in restaurants:
+        keyboard.add(restaurant['name'])
+    
+    await message.reply("Выберите ресторан:", reply_markup=keyboard)
+    await OrderFood.choosing_restaurant.set()
+
+# Остальные обработчики состояний...
+# (добавьте обработчики для выбора еды, адреса, оплаты)
+
+async def on_startup(dp):
+    # Создаем таблицы при старте, если их нет
+    conn = await asyncpg.connect(**DB_CONFIG)
+    await conn.execute('''
+        CREATE TABLE IF NOT EXISTS restaurants (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL
+        )''')
+    # Другие таблицы...
+    await conn.close()
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    executor.start_polling(dp, on_startup=on_startup)

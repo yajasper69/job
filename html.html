@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог моделей</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            padding-bottom: 60px;
+        }
+
+        .container {
+            padding: 15px;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .product-info {
+            padding: 15px;
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .product-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .product-price {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .product-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .favorite-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #ccc;
+        }
+
+        .favorite-btn.active {
+            color: #e74c3c;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            margin-bottom: 3px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Страница каталога -->
+        <div id="catalog-page" class="page active">
+            <h2>Каталог моделей</h2>
+            <div id="product-list"></div>
+        </div>
+
+        <!-- Страница избранного -->
+        <div id="favorites-page" class="page">
+            <h2>Избранное</h2>
+            <div id="favorites-list"></div>
+            <div id="empty-favorites" class="empty-state" style="display: none;">
+                <p>Вы еще ничего не добавили в избранное</p>
+                <button class="btn btn-primary" onclick="showPage('catalog-page')">Перейти в каталог</button>
+            </div>
+        </div>
+
+        <!-- Страница корзины -->
+        <div id="cart-page" class="page">
+            <h2>Корзина</h2>
+            <div id="cart-items"></div>
+            <div id="empty-cart" class="empty-state" style="display: none;">
+                <p>Ваша корзина пуста</p>
+                <button class="btn btn-primary" onclick="showPage('catalog-page')">Перейти в каталог</button>
+            </div>
+            <div id="order-total" style="margin-top: 20px; display: none;">
+                <h3>Итого: <span id="total-amount">0</span> руб.</h3>
+                <button class="btn btn-primary" onclick="placeOrder()">Оформить заказ</button>
+            </div>
+        </div>
+
+        <!-- Страница профиля -->
+        <div id="profile-page" class="page">
+            <h2>Профиль</h2>
+            <div id="user-info"></div>
+            <div style="margin-top: 20px;">
+                <h3>Мои заказы</h3>
+                <div id="orders-list"></div>
+                <div id="empty-orders" class="empty-state" style="display: none;">
+                    <p>У вас еще нет заказов</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Нижнее меню -->
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="showPage('catalog-page')">
+            <span class="nav-icon">🛍️</span>
+            <span>Каталог</span>
+        </div>
+        <div class="nav-item" onclick="showPage('favorites-page')">
+            <span class="nav-icon">❤️</span>
+            <span>Избранное</span>
+        </div>
+        <div class="nav-item" onclick="showPage('cart-page')">
+            <span class="nav-icon">🛒</span>
+            <span>Корзина</span>
+        </div>
+        <div class="nav-item" onclick="showPage('profile-page')">
+            <span class="nav-icon">👤</span>
+            <span>Профиль</span>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация WebApp
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+
+        // Данные товаров (в реальном проекте загружайте с сервера)
+        const products = [
+            {
+                id: '1',
+                name: 'Анна',
+                age: 23,
+                height: 168,
+                weight: 55,
+                chest: 3,
+                price: 5000,
+                description: 'Привет, я Анна! Люблю активный отдых и длительные прогулки. Открыта к новым знакомствам и общению.',
+                photos: [
+                    'https://ru.pinterest.com/pin/347832771237423643/',
+                    'https://ru.pinterest.com/pin/228135537369167793/'
+                ],
+                hours_available: [1, 2, 4, 6, 12]
+            },
+            {
+                id: '2',
+                name: 'Мария',
+                age: 25,
+                height: 172,
+                weight: 58,
+                chest: 2,
+                price: 6000,
+                description: 'Меня зовут Мария. Я творческая личность, люблю искусство и музыку. Всегда рада новым впечатлениям.',
+                photos: [
+                    'https://ru.pinterest.com/pin/137430226132990812/',
+                    'https://ru.pinterest.com/pin/1196337403107781/'
+                ],
+                hours_available: [1, 2, 4, 8]
+            }
+        ];
+
+        // Состояние приложения
+        const state = {
+            favorites: [],
+            cart: [],
+            viewHistory: []
+        };
+
+        // Отображение товаров в каталоге
+        function renderProducts() {
+            const productList = document.getElementById('product-list');
+            productList.innerHTML = '';
+
+            products.forEach(product => {
+                const isFavorite = state.favorites.includes(product.id);
+
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                productCard.innerHTML = `
+                    <img src="${product.photos[0]}" alt="${product.name}" class="product-image">
+                    <button class="favorite-btn ${isFavorite ? 'active' : ''}"
+                            onclick="toggleFavorite('${product.id}')">❤</button>
+                    <div class="product-info">
+                        <div class="product-header">
+                            <div>
+                                <div class="product-name">${product.name}, ${product.age}</div>
+                                <div class="product-meta">
+                                    <span>${product.height} см</span>
+                                    <span>${product.weight} кг</span>
+                                    <span>${product.chest} размер</span>
+                                </div>
+                            </div>
+                            <div class="product-price">${product.price} руб/час</div>
+                        </div>
+                        <button class="btn btn-primary" onclick="showProductDetails('${product.id}')">
+                            Подробнее
+                        </button>
+                    </div>
+                `;
+                productList.appendChild(productCard);
+            });
+        }
+
+        // Переключение страниц
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        // Переключение избранного
+        function toggleFavorite(productId) {
+            const index = state.favorites.indexOf(productId);
+            if (index === -1) {
+                state.favorites.push(productId);
+            } else {
+                state.favorites.splice(index, 1);
+            }
+            renderProducts();
+            renderFavorites();
+        }
+
+        // Показ деталей товара
+        function showProductDetails(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            // Добавляем в историю просмотров
+            if (!state.viewHistory.includes(productId)) {
+                state.viewHistory.unshift(productId);
+                if (state.viewHistory.length > 5) {
+                    state.viewHistory = state.viewHistory.slice(0, 5);
+                }
+            }
+
+            // Создаем модальное окно с деталями
+            Telegram.WebApp.showPopup({
+                title: `${product.name}, ${product.age}`,
+                message: product.description,
+                buttons: [
+                    {id: 'add_to_cart', type: 'default', text: 'Добавить в корзину'},
+                    {type: 'cancel'}
+                ]
+            }, function(btnId) {
+                if (btnId === 'add_to_cart') {
+                    // Здесь можно добавить логику для добавления в корзину
+                }
+            });
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            renderProducts();
+            renderFavorites();
+            renderCart();
+            renderProfile();
+        });
+    </script>
+</body>
+</html>
